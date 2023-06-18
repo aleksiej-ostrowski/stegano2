@@ -1,5 +1,5 @@
-# stegano2
-Steganographic experiments-2 with Youtube
+# stegano-II
+Steganographic experiments-II with Youtube
 
 ## The acceptor-video, hd1080:
 
@@ -28,12 +28,16 @@ Pushkin's novel "Dubrovsky"
 
 ## To run this experiment, follow these steps:
 
+```
+step -1
+Install ffmpeg library
+```
+
 ```bash
 # bash step0.sh
 # Compiling the utility
 
 GO111MODULE=off go build stegano2.go
-
 ```
 
 ```bash
@@ -41,7 +45,6 @@ GO111MODULE=off go build stegano2.go
 # Wrapping an input file with a correction code Bose-Chaudhuri-Hocquenghem
 
 python3 ./wrap/codilla.py -input "./data/dubrowskij.txt" -output "./data/dubrowskij.txt.crp" -e
-
 ```
 
 ```bash
@@ -49,7 +52,6 @@ python3 ./wrap/codilla.py -input "./data/dubrowskij.txt" -output "./data/dubrows
 # "Attention! Steganography takes about 30 minutes in this case"    
     
 time ./stegano2 e 1 "123" "./data/dubrowskij.txt.crp" "./data/new_peoplenyc1080p.mp4" 
-
 ```
 
 ```bash
@@ -58,7 +60,6 @@ time ./stegano2 e 1 "123" "./data/dubrowskij.txt.crp" "./data/new_peoplenyc1080p
 # echo "1. Please, upload the file-result, for example './data/dubrowskij.txt.crp_filesize58435200.webm' to Youtube"    
 # echo "2. Wait about 10 minutes while Youtube chews the file..."    
 # echo "3. Download the chewed file from Youtube and move it to folder './data'. This file may have a name like 'dubrowskij txt crp filesize58435200 [7WhQfMocbQQ].mkv'"
-
 ```
 
 ```bash
