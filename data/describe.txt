@@ -1,0 +1,5 @@
+1) https://www.vidsplay.com/peoplenyc-free-stock-video/ => peoplenyc1080p.mp4, 1920 x 1080
+2) https://freesound.org/people/iamazerrad/sounds/274347/ => orig.mp3, author Iamazerrad 
+3) bash cut.sh # cut off 10 seconds 
+4) bash join.sh # preparing a video with sound
+5) bash lib_dl.sh # download a donor file

@@ -1,0 +1,1 @@
+gofmt -l -s -w .
