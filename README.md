@@ -82,8 +82,8 @@ md5sum "./data/dubrowskij.txt" "./data/dubrowskij.txt.youtube" | md5sum --check
 ```
 
 ## TODO
-- [] Algorithm optimization.
+- [ ] Algorithm optimization.
 
 
 ## Paper about this
-[](https://habr.com/ru/post/)
+[Стеганографические эксперименты с видеофайлами и Youtube. Продолжение](https://habr.com/ru/articles/742378/)
