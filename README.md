@@ -19,7 +19,7 @@ Pushkin's novel "Dubrovsky"
 
 ## Steganography prepared in the "comfortable" mode, hd1080
 
-https://user-images.githubusercontent.com/55213346/153609701-b25d4be6-d690-4389-b8a8-bba8010d10f1.mp4
+[!["Comfortable" mode](comfort.png)](https://cloud.mail.ru/public/8seB/9WvfZQmPk)
 
 ## Steganography, comparison of "aggressive" and "comfortable" modes, hd1080
 
