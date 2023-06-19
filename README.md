@@ -30,7 +30,10 @@ Pushkin's novel "Dubrovsky"
 
 ```
 # step -1
-# Install ffmpeg library
+# 1. Install ffmpeg library...
+# 2. Install python requirements:
+
+python3 -m pip install -r ./wrap/requirements.txt
 ```
 
 ```bash
