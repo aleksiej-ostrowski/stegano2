@@ -28,7 +28,7 @@ Pushkin's novel "Dubrovsky"
 
 ## To run this experiment, follow these steps:
 
-```
+```bash
 # step -1
 # 1. Install ffmpeg library...
 # 2. Install python requirements:
