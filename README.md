@@ -31,9 +31,13 @@ Pushkin's novel "Dubrovsky"
 ```bash
 # step -1
 # 1. Install ffmpeg library...
-# 2. Install python requirements:
+# 2. Install Python requirements:
 
 python3 -m pip install -r ./wrap/requirements.txt
+
+# 3. Install Golang requirements:
+
+go get -u github.com/edsrzf/mmap-go
 ```
 
 ```bash
