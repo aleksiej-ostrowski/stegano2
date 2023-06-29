@@ -35,8 +35,8 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
-    "sync"
 )
 
 const (
@@ -131,7 +131,7 @@ func convertGrayToNRGBA(grayImg *image.Gray) *image.NRGBA {
 func makeMix(img_ *[]uint8, pic_num uint32, prms TMainParams) (image.Image, error) {
 
 	img := image.NewGray(image.Rect(0, 0, prms.width_pics, prms.height_pics))
-    copy(img.Pix, *img_)
+	copy(img.Pix, *img_)
 
 	back, err := selectBack(pic_num, prms)
 	if err != nil {
@@ -176,7 +176,6 @@ func selectBack(pic_num uint32, prms TMainParams) (image.Image, error) {
 
 	return img_back, nil
 }
-
 
 func bin2pics(prms TMainParams) (int64, error) {
 
@@ -225,7 +224,7 @@ func bin2pics(prms TMainParams) (int64, error) {
 
 	go func(bit_chan <-chan uint8, manager chan<- int64, prms TMainParams) {
 
-        img_ := make([]uint8, prms.width_pics * prms.height_pics)
+		img_ := make([]uint8, prms.width_pics*prms.height_pics)
 
 		how_w := prms.width_pics / prms.square_size
 		how_hw := prms.height_pics * how_w / prms.square_size
@@ -242,7 +241,7 @@ func bin2pics(prms TMainParams) (int64, error) {
 		}
 
 		make_pic := func(bit uint8, offset int, img_ *[]uint8, wg *sync.WaitGroup) {
-            defer (*wg).Done()
+			defer (*wg).Done()
 			LABEL := recognize.NO
 			if bit == 1 {
 				LABEL = recognize.YES
@@ -252,60 +251,60 @@ func bin2pics(prms TMainParams) (int64, error) {
 				copy((*img_)[hlp_cnst3:hlp_cnst3+prms.square_size],
 					LABEL[hlp_cnst2[sq]:hlp_cnst2[sq]+prms.square_size])
 			}
-        } 
+		}
 
-        save_pic := func(wg *sync.WaitGroup) {
-            (*wg).Wait()
-            offset, idx_w, idx_hw = 0, 0, 0
-            img_mix, err := makeMix(&img_, pic_num, prms)
-            if err != nil {
-                log.Error(err)
-                panic(err)
-            }
-            err = saveImg(img_mix, pic_num, prms)
-            if err != nil {
-                log.Error(err)
-                panic(err)
-            }
-            img_ = make([]uint8, prms.width_pics * prms.height_pics)
-            pic_num += 1
-        }
+		save_pic := func(wg *sync.WaitGroup) {
+			(*wg).Wait()
+			offset, idx_w, idx_hw = 0, 0, 0
+			img_mix, err := makeMix(&img_, pic_num, prms)
+			if err != nil {
+				log.Error(err)
+				panic(err)
+			}
+			err = saveImg(img_mix, pic_num, prms)
+			if err != nil {
+				log.Error(err)
+				panic(err)
+			}
+			img_ = make([]uint8, prms.width_pics*prms.height_pics)
+			pic_num += 1
+		}
 
-        var wg sync.WaitGroup    
+		var wg sync.WaitGroup
 
-        add_offset := func() {
-   			offset += prms.square_size
+		add_offset := func() {
+			offset += prms.square_size
 			idx_w += 1
 			if idx_w >= how_w {
 				idx_w = 0
 				offset += hlp_cnst0
 			}
-        }
+		}
 
 		for bit := range bit_chan {
 			fs++
-            wg.Add(1)
+			wg.Add(1)
 			go make_pic(bit, offset, &img_, &wg)
-            add_offset()
+			add_offset()
 			idx_hw += 1
 
-            if idx_hw % runtime.GOMAXPROCS(0) == 0 {
-                wg.Wait()
-            }
+			if idx_hw%runtime.GOMAXPROCS(0) == 0 {
+				wg.Wait()
+			}
 
-            if idx_hw < how_hw {
-                continue
-            }
-            save_pic(&wg)
-     	}
+			if idx_hw < how_hw {
+				continue
+			}
+			save_pic(&wg)
+		}
 
 		if idx_hw > 0 {
 			for dust := idx_hw; dust < how_hw; dust++ {
-                wg.Add(1)
+				wg.Add(1)
 				go make_pic(uint8(rand.Intn(2)), offset, &img_, &wg)
-                add_offset()
+				add_offset()
 			}
-            save_pic(&wg)
+			save_pic(&wg)
 		}
 		manager <- fs
 
@@ -342,8 +341,8 @@ func selectNumFromFileName(filename string) (int64, error) {
 }
 
 type byteStruct struct {
-    rs int
-    num int
+	rs  int
+	num int
 }
 
 func decodeVideo(prms TMainParams) error {
@@ -385,47 +384,47 @@ func decodeVideo(prms TMainParams) error {
 		bounds := img.Bounds()
 		width_, height_ := bounds.Max.X, bounds.Max.Y
 		save_byte, num_bit := uint8(0), 0
-        byte_chan := make(chan byteStruct, 8)
+		byte_chan := make(chan byteStruct, 8)
 
-        var wg sync.WaitGroup
+		var wg sync.WaitGroup
 
 		for y := 0; y <= height_-prms.square_size; y += prms.square_size {
 			for x := 0; x <= width_-prms.square_size; x += prms.square_size {
-                wg.Add(1)
-                go func(x, y, num_bit int) {
-                    defer wg.Done()
-                    var res byteStruct
-				    res.rs = recognize.Recognize8(&img, x, y)
-                    res.num = num_bit
-                    byte_chan <- res
-                }(x, y, num_bit)    
+				wg.Add(1)
+				go func(x, y, num_bit int) {
+					defer wg.Done()
+					var res byteStruct
+					res.rs = recognize.Recognize8(&img, x, y)
+					res.num = num_bit
+					byte_chan <- res
+				}(x, y, num_bit)
 
-                num_bit++
+				num_bit++
 
-                if num_bit <= 7 {
-                    continue
-                }    
+				if num_bit <= 7 {
+					continue
+				}
 
-                wg.Wait()
+				wg.Wait()
 
-                for len(byte_chan) > 0 {
-                    el := <-byte_chan
-                    rs := el.rs 
-                    if rs == 0 {
-                        rs = rand.Intn(2)
-                    }
-                    if rs == 1 {
-                        save_byte |= 1 << el.num
-                    }
-                }
+				for len(byte_chan) > 0 {
+					el := <-byte_chan
+					rs := el.rs
+					if rs == 0 {
+						rs = rand.Intn(2)
+					}
+					if rs == 1 {
+						save_byte |= 1 << el.num
+					}
+				}
 
-                err := writer.WriteByte(save_byte)
-                if err != nil {
-                    return err
-                }
+				err := writer.WriteByte(save_byte)
+				if err != nil {
+					return err
+				}
 
-                save_byte, num_bit = uint8(0), 0
-                cnt += 8
+				save_byte, num_bit = uint8(0), 0
+				cnt += 8
 
 				if cnt >= fs {
 					return nil
@@ -645,7 +644,7 @@ For decrypting a video file:
 			"-map", "a",
 			filepath.Join(MainParams.tempDir_audio, "back.mp3"),
 			filepath.Join(MainParams.tempDir_bpics, "pic_%8d.png"),
-            "-threads", strconv.Itoa(runtime.GOMAXPROCS(0)),
+			"-threads", strconv.Itoa(runtime.GOMAXPROCS(0)),
 		)
 
 		step1.Stderr = os.Stderr
@@ -689,7 +688,7 @@ For decrypting a video file:
 			"-pattern_type", "glob",
 			"-i", filepath.Join(MainParams.tempDir_rpics, "*.png"),
 			filepath.Join(MainParams.tempDir_res, "video.webm"),
-            "-threads", strconv.Itoa(runtime.GOMAXPROCS(0)),
+			"-threads", strconv.Itoa(runtime.GOMAXPROCS(0)),
 		)
 
 		join_pngs.Stderr = os.Stderr
@@ -713,7 +712,7 @@ For decrypting a video file:
 				"-stream_loop", strconv.Itoa(repetition_rate-1),
 				"-i", filepath.Join(MainParams.tempDir_audio, "back.mp3"),
 				filepath.Join(MainParams.tempDir_audio, "new_back.mp3"),
-                "-threads", strconv.Itoa(runtime.GOMAXPROCS(0)),
+				"-threads", strconv.Itoa(runtime.GOMAXPROCS(0)),
 			)
 
 			repeat_audio.Stderr = os.Stderr
@@ -739,7 +738,7 @@ For decrypting a video file:
 			// "-c:v", "copy",
 			// "-c:a", "copy",
 			filepath.Join(MainParams.tempDir_res, "main_video.webm"),
-            "-threads", strconv.Itoa(runtime.GOMAXPROCS(0)),
+			"-threads", strconv.Itoa(runtime.GOMAXPROCS(0)),
 		)
 
 		main_result.Stderr = os.Stderr
@@ -764,7 +763,7 @@ For decrypting a video file:
 			"ffmpeg", "-y",
 			"-i", MainParams.video_input,
 			filepath.Join(MainParams.tempDir_rpics, "pic_%8d.png"),
-            "-threads", strconv.Itoa(runtime.GOMAXPROCS(0)),
+			"-threads", strconv.Itoa(runtime.GOMAXPROCS(0)),
 		)
 
 		step1.Stderr = os.Stderr
