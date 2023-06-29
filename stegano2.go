@@ -23,7 +23,8 @@ import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"image"
-	"image/color"
+	// "image/color"
+	"image/draw"
 	"image/png"
 	"io/ioutil"
 	"math"
@@ -110,6 +111,8 @@ func GetPNGDimensions(filename string) (int, int, error) {
 	return imageData.Width, imageData.Height, nil
 }
 
+/*
+
 func convertGrayToNRGBA(grayImg *image.Gray) *image.NRGBA {
 
 	bounds := grayImg.Bounds()
@@ -126,6 +129,13 @@ func convertGrayToNRGBA(grayImg *image.Gray) *image.NRGBA {
 	}
 
 	return nrgbaImg
+}
+*/
+
+func convertGrayToNRGBA(src *image.Gray) *image.NRGBA {
+	dst := image.NewNRGBA(src.Bounds())
+	draw.Draw(dst, dst.Bounds(), src, src.Bounds().Min, draw.Src)
+	return dst
 }
 
 func makeMix(img_ *[]uint8, pic_num uint32, prms TMainParams) (image.Image, error) {
@@ -175,6 +185,11 @@ func selectBack(pic_num uint32, prms TMainParams) (image.Image, error) {
 	}
 
 	return img_back, nil
+}
+
+type saveImgStruct struct {
+	img image.Image
+	num uint32
 }
 
 func bin2pics(prms TMainParams) (int64, error) {
@@ -253,19 +268,33 @@ func bin2pics(prms TMainParams) (int64, error) {
 			}
 		}
 
-		save_pic := func(wg *sync.WaitGroup) {
-			(*wg).Wait()
+		save_chan := make(chan saveImgStruct)
+		defer close(save_chan)
+
+		go func(save_chan <-chan saveImgStruct) {
+			for el := range save_chan {
+				err := saveImg(el.img, el.num, prms)
+				if err != nil {
+					log.Error(err)
+					panic(err)
+				}
+			}
+		}(save_chan)
+
+		save_pic := func(save_chan chan<- saveImgStruct) {
 			offset, idx_w, idx_hw = 0, 0, 0
 			img_mix, err := makeMix(&img_, pic_num, prms)
 			if err != nil {
 				log.Error(err)
 				panic(err)
 			}
-			err = saveImg(img_mix, pic_num, prms)
-			if err != nil {
-				log.Error(err)
-				panic(err)
-			}
+			var el saveImgStruct
+
+			el.img = img_mix
+			el.num = pic_num
+
+			save_chan <- el
+
 			img_ = make([]uint8, prms.width_pics*prms.height_pics)
 			pic_num += 1
 		}
@@ -288,14 +317,18 @@ func bin2pics(prms TMainParams) (int64, error) {
 			add_offset()
 			idx_hw += 1
 
-			if idx_hw%runtime.GOMAXPROCS(0) == 0 {
-				wg.Wait()
-			}
+			/*
+				if idx_hw%runtime.GOMAXPROCS(0) == 0 {
+					wg.Wait()
+				}
+			*/
 
 			if idx_hw < how_hw {
 				continue
 			}
-			save_pic(&wg)
+
+			wg.Wait()
+			save_pic(save_chan)
 		}
 
 		if idx_hw > 0 {
@@ -304,7 +337,9 @@ func bin2pics(prms TMainParams) (int64, error) {
 				go make_pic(uint8(rand.Intn(2)), offset, &img_, &wg)
 				add_offset()
 			}
-			save_pic(&wg)
+
+			wg.Wait()
+			save_pic(save_chan)
 		}
 		manager <- fs
 
