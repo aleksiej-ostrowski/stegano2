@@ -20,7 +20,7 @@ func New(width, height int, fillColor color.Color) *image.NRGBA {
 
 	return &image.NRGBA{
 		Pix:    bytes.Repeat([]byte{c.R, c.G, c.B, c.A}, width*height),
-		Stride: 4 * width,
+		Stride: width << 2,
 		Rect:   image.Rect(0, 0, width, height),
 	}
 }
@@ -29,7 +29,7 @@ func New(width, height int, fillColor color.Color) *image.NRGBA {
 func Clone(img image.Image) *image.NRGBA {
 	src := newScanner(img)
 	dst := image.NewNRGBA(image.Rect(0, 0, src.w, src.h))
-	size := src.w * 4
+	size := src.w << 2
 	parallel(0, src.h, func(ys <-chan int) {
 		for y := range ys {
 			i := y * dst.Stride
@@ -62,29 +62,29 @@ func anchorPt(b image.Rectangle, w, h int, anchor Anchor) image.Point {
 		x = b.Min.X
 		y = b.Min.Y
 	case Top:
-		x = b.Min.X + (b.Dx()-w)/2
+		x = b.Min.X + (b.Dx()-w)>>1
 		y = b.Min.Y
 	case TopRight:
 		x = b.Max.X - w
 		y = b.Min.Y
 	case Left:
 		x = b.Min.X
-		y = b.Min.Y + (b.Dy()-h)/2
+		y = b.Min.Y + (b.Dy()-h)>>1
 	case Right:
 		x = b.Max.X - w
-		y = b.Min.Y + (b.Dy()-h)/2
+		y = b.Min.Y + (b.Dy()-h)>>1
 	case BottomLeft:
 		x = b.Min.X
 		y = b.Max.Y - h
 	case Bottom:
-		x = b.Min.X + (b.Dx()-w)/2
+		x = b.Min.X + (b.Dx()-w)>>1
 		y = b.Max.Y - h
 	case BottomRight:
 		x = b.Max.X - w
 		y = b.Max.Y - h
 	default:
-		x = b.Min.X + (b.Dx()-w)/2
-		y = b.Min.Y + (b.Dy()-h)/2
+		x = b.Min.X + (b.Dx()-w)>>1
+		y = b.Min.Y + (b.Dy()-h)>>1
 	}
 	return image.Pt(x, y)
 }
@@ -102,7 +102,7 @@ func Crop(img image.Image, rect image.Rectangle) *image.NRGBA {
 
 	src := newScanner(img)
 	dst := image.NewNRGBA(image.Rect(0, 0, r.Dx(), r.Dy()))
-	rowSize := r.Dx() * 4
+	rowSize := r.Dx() << 2
 	parallel(r.Min.Y, r.Max.Y, func(ys <-chan int) {
 		for y := range ys {
 			i := (y - r.Min.Y) * dst.Stride
@@ -148,8 +148,8 @@ func Paste(background, img image.Image, pos image.Point) *image.NRGBA {
 			x2 := interRect.Max.X - pasteRect.Min.X
 			y1 := y - pasteRect.Min.Y
 			y2 := y1 + 1
-			i1 := y*dst.Stride + interRect.Min.X*4
-			i2 := i1 + interRect.Dx()*4
+			i1 := y*dst.Stride + interRect.Min.X<<2
+			i2 := i1 + interRect.Dx()<<2
 			src.scan(x1, y1, x2, y2, dst.Pix[i1:i2])
 		}
 	})
@@ -164,11 +164,11 @@ func PasteCenter(background, img image.Image) *image.NRGBA {
 	bgMinX := bgBounds.Min.X
 	bgMinY := bgBounds.Min.Y
 
-	centerX := bgMinX + bgW/2
-	centerY := bgMinY + bgH/2
+	centerX := bgMinX + bgW>>1
+	centerY := bgMinY + bgH>>1
 
-	x0 := centerX - img.Bounds().Dx()/2
-	y0 := centerY - img.Bounds().Dy()/2
+	x0 := centerX - img.Bounds().Dx()>>1
+	y0 := centerY - img.Bounds().Dy()>>1
 
 	return Paste(background, img, image.Pt(x0, y0))
 }
@@ -194,15 +194,16 @@ func Overlay(background, img image.Image, pos image.Point, opacity float64) *ima
 		return dst
 	}
 	src := newScanner(img)
+	l_255 := 1. / 255.
 	parallel(interRect.Min.Y, interRect.Max.Y, func(ys <-chan int) {
-		scanLine := make([]uint8, interRect.Dx()*4)
+		scanLine := make([]uint8, interRect.Dx()<<2)
 		for y := range ys {
 			x1 := interRect.Min.X - pasteRect.Min.X
 			x2 := interRect.Max.X - pasteRect.Min.X
 			y1 := y - pasteRect.Min.Y
 			y2 := y1 + 1
 			src.scan(x1, y1, x2, y2, scanLine)
-			i := y*dst.Stride + interRect.Min.X*4
+			i := y*dst.Stride + interRect.Min.X<<2
 			j := 0
 			for x := interRect.Min.X; x < interRect.Max.X; x++ {
 				d := dst.Pix[i : i+4 : i+4]
@@ -217,16 +218,17 @@ func Overlay(background, img image.Image, pos image.Point, opacity float64) *ima
 				b2 := float64(s[2])
 				a2 := float64(s[3])
 
-				coef2 := opacity * a2 / 255
-				coef1 := (1 - coef2) * a1 / 255
+				coef2 := opacity * a2 * l_255
+				coef1 := (1. - coef2) * a1 * l_255
 				coefSum := coef1 + coef2
-				coef1 /= coefSum
-				coef2 /= coefSum
+				l_coefSum := 1. / coefSum
+				coef1 *= l_coefSum
+				coef2 *= l_coefSum
 
 				d[0] = uint8(r1*coef1 + r2*coef2)
 				d[1] = uint8(g1*coef1 + g2*coef2)
 				d[2] = uint8(b1*coef1 + b2*coef2)
-				d[3] = uint8(math.Min(a1+a2*opacity*(255-a1)/255, 255))
+				d[3] = uint8(math.Min(a1+a2*opacity*(255.-a1)*l_255, 255.))
 
 				i += 4
 				j += 4
@@ -246,11 +248,11 @@ func OverlayCenter(background, img image.Image, opacity float64) *image.NRGBA {
 	bgMinX := bgBounds.Min.X
 	bgMinY := bgBounds.Min.Y
 
-	centerX := bgMinX + bgW/2
-	centerY := bgMinY + bgH/2
+	centerX := bgMinX + bgW>>1
+	centerY := bgMinY + bgH>>1
 
-	x0 := centerX - img.Bounds().Dx()/2
-	y0 := centerY - img.Bounds().Dy()/2
+	x0 := centerX - img.Bounds().Dx()>>1
+	y0 := centerY - img.Bounds().Dy()>>1
 
 	return Overlay(background, img, image.Point{x0, y0}, opacity)
 }
