@@ -1,6 +1,15 @@
 # stegano-II
 Steganographic experiments-II with Youtube
 
+## About
+
+This Golang-based program ingeniously exploits binary files into a YouTube-movie format. Designed with a creative approach to data storage, it turns YouTube into an unconventional but highly accessible storage medium. However, the process does present some robustness issues given the complexities of maintaining data integrity through conversion, upload, and retrieval. To tackle these challenges, the program incorporates a specialized algorithm ensuring the robustness of the data both when saving information into the movie format and during recovery from the YouTube movie. This unique function essentially enables a novel way of data preservation and retrieval via a globally accessible platform like YouTube. 
+[More about](https://www.aleksiej.com/id/H3XOqkzQuOR6/index.html)
+
+## Warning
+
+It was developed and tested on Ubuntu 22.04 (Linux). Given its specific environment, usage in other operating systems may require modification.
+
 ## The acceptor-video, hd1080:
 
 [![Acceptor-video with sound](https://img.youtube.com/vi/aADa2FI6iDo/0.jpg)](https://www.youtube.com/watch?v=aADa2FI6iDo)
@@ -90,7 +99,8 @@ md5sum "./data/dubrowskij.txt" "./data/dubrowskij.txt.youtube" | md5sum --check
 ```
 
 ## TODO
-- [ ] Algorithm optimization.
+- [ ] Acceleration of encoding.
+- [x] Decoding is accelerated almost x2.
 
 
 ## Paper about this
