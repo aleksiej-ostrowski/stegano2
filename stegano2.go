@@ -25,7 +25,8 @@ import (
 	"image"
 	// "image/color"
 	"image/draw"
-	"image/png"
+	// "image/png"
+	"golang.org/x/image/bmp"
 	"io/ioutil"
 	"math"
 	"math/rand"
@@ -81,7 +82,7 @@ type TMainParams struct {
 
 func saveImg(img image.Image, pic_num uint32, prms TMainParams) error {
 
-	fn := filepath.Join(prms.tempDir_rpics, fmt.Sprintf("pic_%0*d.png", 8, pic_num))
+	fn := filepath.Join(prms.tempDir_rpics, fmt.Sprintf("pic_%0*d.bmp", 8, pic_num))
 	file, err := os.Create(fn)
 
 	if err != nil {
@@ -89,7 +90,7 @@ func saveImg(img image.Image, pic_num uint32, prms TMainParams) error {
 	}
 
 	defer file.Close()
-	err = png.Encode(file, img)
+	err = bmp.Encode(file, img)
 	if err != nil {
 		return fmt.Errorf("Сannot encode a file %s", fn)
 	}
@@ -175,13 +176,13 @@ func selectBack(pic_num uint32, prms TMainParams) (image.Image, error) {
 		}
 	}
 
-	back, err := os.OpenFile(filepath.Join(prms.tempDir_bpics, fmt.Sprintf("pic_%0*d.png", 8, pic_num)), os.O_RDONLY, 0600)
+	back, err := os.OpenFile(filepath.Join(prms.tempDir_bpics, fmt.Sprintf("pic_%0*d.bmp", 8, pic_num)), os.O_RDONLY, 0600)
 	if err != nil {
 		return nil, err
 	}
 	defer back.Close()
 
-	img_back, err := png.Decode(back)
+	img_back, err := bmp.Decode(back)
 	if err != nil {
 		return nil, err
 	}
@@ -407,13 +408,13 @@ func decodeVideo(prms TMainParams) error {
 
 		pic_num += 1
 
-		file, err := os.OpenFile(filepath.Join(prms.tempDir_rpics, fmt.Sprintf("pic_%0*d.png", 8, pic_num)), os.O_RDONLY, 0600)
+		file, err := os.OpenFile(filepath.Join(prms.tempDir_rpics, fmt.Sprintf("pic_%0*d.bmp", 8, pic_num)), os.O_RDONLY, 0600)
 		if err != nil {
 			return err
 		}
 		defer file.Close()
 
-		img, err := png.Decode(file)
+		img, err := bmp.Decode(file)
 		if err != nil {
 			return err
 		}
@@ -684,7 +685,7 @@ For decrypting a video file:
 			"-q:a", "0",
 			"-map", "a",
 			filepath.Join(MainParams.tempDir_audio, "back.mp3"),
-			filepath.Join(MainParams.tempDir_bpics, "pic_%8d.png"),
+			filepath.Join(MainParams.tempDir_bpics, "pic_%8d.bmp"),
 			"-threads", strconv.Itoa(runtime.GOMAXPROCS(0)),
 		)
 
@@ -705,7 +706,7 @@ For decrypting a video file:
 			return
 		}
 
-		MainParams.width_pics, MainParams.height_pics, err = GetPNGDimensions(filepath.Join(MainParams.tempDir_bpics, fmt.Sprintf("pic_%0*d.png", 8, 1)))
+		MainParams.width_pics, MainParams.height_pics, err = GetPNGDimensions(filepath.Join(MainParams.tempDir_bpics, fmt.Sprintf("pic_%0*d.bmp", 8, 1)))
 		if err != nil {
 			return
 		}
@@ -724,18 +725,18 @@ For decrypting a video file:
 
 		_ = os.Remove(MainParams.xN_input_stir)
 
-		join_pngs := exec.Command(
+		join_bmps := exec.Command(
 			"ffmpeg", "-y",
 			"-pattern_type", "glob",
-			"-i", filepath.Join(MainParams.tempDir_rpics, "*.png"),
+			"-i", filepath.Join(MainParams.tempDir_rpics, "*.bmp"),
 			filepath.Join(MainParams.tempDir_res, "video.webm"),
 			"-threads", strconv.Itoa(runtime.GOMAXPROCS(0)),
 		)
 
-		join_pngs.Stderr = os.Stderr
-		join_pngs.Stdout = os.Stdout
+		join_bmps.Stderr = os.Stderr
+		join_bmps.Stdout = os.Stdout
 
-		err = join_pngs.Run()
+		err = join_bmps.Run()
 		if err != nil {
 			return
 		}
@@ -803,7 +804,7 @@ For decrypting a video file:
 		step1 := exec.Command(
 			"ffmpeg", "-y",
 			"-i", MainParams.video_input,
-			filepath.Join(MainParams.tempDir_rpics, "pic_%8d.png"),
+			filepath.Join(MainParams.tempDir_rpics, "pic_%8d.bmp"),
 			"-threads", strconv.Itoa(runtime.GOMAXPROCS(0)),
 		)
 

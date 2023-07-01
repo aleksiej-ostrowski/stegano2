@@ -47,6 +47,8 @@ python3 -m pip install -r ./wrap/requirements.txt
 # 3. Install Golang requirements:
 
 go get -u github.com/edsrzf/mmap-go
+go get -u "golang.org/x/image/bmp"
+
 ```
 
 ```bash
@@ -99,8 +101,8 @@ md5sum "./data/dubrowskij.txt" "./data/dubrowskij.txt.youtube" | md5sum --check
 ```
 
 ## TODO
-- [ ] Acceleration of encoding.
-- [x] Decoding is accelerated almost x2.
+- [x] Enncoding is accelerated ~ x1.7
+- [x] Decoding is accelerated ~ x2.4
 
 
 ## Paper about this
