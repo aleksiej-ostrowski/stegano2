@@ -30,7 +30,7 @@ import (
 	"io/ioutil"
 	"math"
 	"math/rand"
-	"net/http"
+	// "net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/exec"
@@ -479,9 +479,13 @@ func decodeVideo(prms TMainParams) error {
 
 func main() {
 
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
+	/*
+
+		go func() {
+			log.Println(http.ListenAndServe("localhost:6060", nil))
+		}()
+
+	*/
 
 	MainParams := TMainParams{}
 	MainParams.info = `
