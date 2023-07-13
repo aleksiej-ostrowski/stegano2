@@ -103,7 +103,7 @@ md5sum "./data/dubrowskij.txt" "./data/dubrowskij.txt.youtube" | md5sum --check
 ## TODO
 - [x] Enncoding is accelerated ~ x1.7
 - [x] Decoding is accelerated ~ x2.4
-
+- [] Don't unpack all a video at once. Instead, prepare the pipe and send it one frame at a time.
 
 ## Paper about this
 [Стеганографические эксперименты с видеофайлами и Youtube. Продолжение](https://habr.com/ru/articles/742378/)
