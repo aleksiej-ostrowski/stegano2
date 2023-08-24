@@ -2,7 +2,7 @@
 
 # ------------------------------ #
 #                                #
-#  version 0.0.2                 #
+#  version 0.0.3                 #
 #                                #
 #  Aleksiej Ostrowski, 2023      #
 #                                #
@@ -31,6 +31,7 @@ import (
 	"math"
 	"math/rand"
 	// "net/http"
+	"encoding/json"
 	_ "net/http/pprof"
 	"os"
 	"os/exec"
@@ -78,6 +79,40 @@ type TMainParams struct {
 	code_key               string
 	mix                    float64
 	shuffle_bits           bool
+	has_audio              bool
+}
+
+type ProbeData struct {
+	Streams []struct {
+		CodecType string `json:"codec_type"`
+	} `json:"streams"`
+}
+
+func hasAudio(videoFile string) (bool, error) {
+	cmd := exec.Command("ffprobe",
+		"-v", "quiet",
+		"-print_format", "json",
+		"-show_streams",
+		videoFile,
+	)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return false, fmt.Errorf("Error running ffprobe: %v", err)
+	}
+
+	var probeData ProbeData
+	err = json.Unmarshal(output, &probeData)
+	if err != nil {
+		return false, fmt.Errorf("Error unmarshalling probe data: %v", err)
+	}
+
+	for _, stream := range probeData.Streams {
+		if stream.CodecType == "audio" {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func saveImg(img image.Image, pic_num uint32, prms TMainParams) error {
@@ -492,7 +527,7 @@ func main() {
 
 #----------------------------#
 #                            #
-#  version 0.0.2             #
+#  version 0.0.3             #
 #                            #
 #  Aleksiej Ostrowski, 2023  #
 #                            #
@@ -593,7 +628,7 @@ For decrypting a video file:
 		return
 	}
 
-	for _, necessary := range []string{"ffmpeg"} { // + "ffprobe"
+	for _, necessary := range []string{"ffmpeg", "ffprobe"} {
 		if _, err = exec.LookPath(necessary); err != nil {
 			return
 		}
@@ -683,15 +718,28 @@ For decrypting a video file:
 
 		_ = os.Remove(MainParams.xN_input)
 
-		step1 := exec.Command(
-			"ffmpeg", "-y",
-			"-i", MainParams.back_filename,
-			"-q:a", "0",
-			"-map", "a",
-			filepath.Join(MainParams.tempDir_audio, "back.mp3"),
+		audioExists, err := hasAudio(MainParams.back_filename)
+		if err != nil {
+			return
+		}
+
+		MainParams.has_audio = audioExists
+
+		var args []string
+		args = append(args, "ffmpeg", "-y", "-i", MainParams.back_filename)
+
+		if audioExists {
+			args = append(args,
+				"-q:a", "0",
+				"-map", "a",
+				filepath.Join(MainParams.tempDir_audio, "back.mp3"))
+		}
+
+		args = append(args,
 			filepath.Join(MainParams.tempDir_bpics, "pic_%8d.bmp"),
-			"-threads", strconv.Itoa(runtime.GOMAXPROCS(0)),
-		)
+			"-threads", strconv.Itoa(runtime.GOMAXPROCS(0)))
+
+		step1 := exec.Command(args[0], args[1:]...)
 
 		step1.Stderr = os.Stderr
 		step1.Stdout = os.Stdout
@@ -749,35 +797,46 @@ For decrypting a video file:
 			return
 		}
 
-		repetition_rate := int(math.Ceil(float64(MainParams.max_rpics) / float64(MainParams.max_bpics)))
+		if MainParams.has_audio {
 
-		if repetition_rate > 1 {
+			repetition_rate := int(math.Ceil(float64(MainParams.max_rpics) / float64(MainParams.max_bpics)))
 
-			repeat_audio := exec.Command(
-				"ffmpeg", "-y",
-				"-stream_loop", strconv.Itoa(repetition_rate-1),
-				"-i", filepath.Join(MainParams.tempDir_audio, "back.mp3"),
-				filepath.Join(MainParams.tempDir_audio, "new_back.mp3"),
-				"-threads", strconv.Itoa(runtime.GOMAXPROCS(0)),
-			)
+			if repetition_rate > 1 {
 
-			repeat_audio.Stderr = os.Stderr
-			repeat_audio.Stdout = os.Stdout
+				repeat_audio := exec.Command(
+					"ffmpeg", "-y",
+					"-stream_loop", strconv.Itoa(repetition_rate-1),
+					"-i", filepath.Join(MainParams.tempDir_audio, "back.mp3"),
+					filepath.Join(MainParams.tempDir_audio, "new_back.mp3"),
+					"-threads", strconv.Itoa(runtime.GOMAXPROCS(0)),
+				)
 
-			err = repeat_audio.Run()
-			if err != nil {
-				return
+				repeat_audio.Stderr = os.Stderr
+				repeat_audio.Stdout = os.Stdout
+
+				err = repeat_audio.Run()
+				if err != nil {
+					return
+				}
+			} else {
+				err = os.Link(filepath.Join(MainParams.tempDir_audio, "back.mp3"), filepath.Join(MainParams.tempDir_audio, "new_back.mp3"))
+				if err != nil {
+					return
+				}
 			}
-		} else {
-			err = os.Link(filepath.Join(MainParams.tempDir_audio, "back.mp3"), filepath.Join(MainParams.tempDir_audio, "new_back.mp3"))
-			if err != nil {
-				return
-			}
+
 		}
 
-		main_result := exec.Command(
-			"ffmpeg", "-y",
-			"-i", filepath.Join(MainParams.tempDir_audio, "new_back.mp3"),
+		args = []string{}
+		args = append(args, "ffmpeg", "-y")
+
+		if MainParams.has_audio {
+			args = append(args,
+				"-i", filepath.Join(MainParams.tempDir_audio, "new_back.mp3"),
+			)
+		}
+
+		args = append(args,
 			"-i", filepath.Join(MainParams.tempDir_res, "video.webm"),
 			// "-map", "0:v",
 			// "-map", "1:a",
@@ -786,6 +845,8 @@ For decrypting a video file:
 			filepath.Join(MainParams.tempDir_res, "main_video.webm"),
 			"-threads", strconv.Itoa(runtime.GOMAXPROCS(0)),
 		)
+
+		main_result := exec.Command(args[0], args[1:]...)
 
 		main_result.Stderr = os.Stderr
 		main_result.Stdout = os.Stdout

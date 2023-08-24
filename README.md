@@ -101,6 +101,7 @@ md5sum "./data/dubrowskij.txt" "./data/dubrowskij.txt.youtube" | md5sum --check
 ```
 
 ## TODO
+- [x] Fixed an error when preparing video without audio track. 24.08.2023
 - [x] Enncoding is accelerated ~ x1.7
 - [x] Decoding is accelerated ~ x2.4
 - [ ] Don't unpack all a video at once. Instead, prepare the pipe and send it one frame at a time.
