@@ -1,4 +1,6 @@
 echo "=== step 1 ==="
 
-# python3 ./wrap/codilla.py -input "./data/dubrowskij.txt" -output "./data/dubrowskij.txt.crp" -e
-python3 ./wrap/codilla.py -input "./data/Jose.Raul.Capablanca2.mp4" -output "./data/Jose.Raul.Capablanca2.mp4.crp" -e
+time ./stegano2 merge --key "123" --mode aggressive \
+    --data "./data/dubrowskij.txt" \
+    --original "./data/new_peoplenyc1080p.mp4" \
+    --result "./data/new_peoplenyc1080p_new.mp4"

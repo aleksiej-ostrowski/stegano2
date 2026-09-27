@@ -1,253 +1,182 @@
-/*
-
-# ------------------------------ #
-#                                #
-#  version 0.0.2                 #
-#                                #
-#  Aleksiej Ostrowski, 2023      #
-#                                #
-#  https://aleksiej.com          #
-#                                #
-# ------------------------------ #
-
-*/
+//============================================//
+// Пакет stir                                 //
+//                                            //
+// Назначение:                                //
+//   перемешивание байтов потока и битов      //
+//   внутри каждого байта псевдослучайной     //
+//   перестановкой, заданной ключом.          //
+//   Перестановки совпадают с прежней         //
+//   версией программы.                       //
+//                                            //
+// Автор: Aleksiej Ostrowski                  //
+// Версия: 0.1.0                              //
+//============================================//
 
 package stir
 
 import (
-	"bufio"
-	"github.com/edsrzf/mmap-go"
 	"hash/fnv"
-	"io"
 	"math/rand"
-	"os"
-	// "fmt"
 )
 
-func hashInt64(code string) int64 {
+// bitOrder — перестановка битов байта.
+type bitOrder [CNT_BITS_BYTE]uint8
+
+// SeedOf превращает ключ в начальное
+// значение генератора (хеш FNV-1a).
+//
+// Параметры:
+//   - key: ключ перемешивания.
+//
+// Возвращает: начальное значение.
+func SeedOf(key string) int64 {
 	hash := fnv.New64a()
-	hash.Write([]byte(code))
+	hash.Write([]byte(key))
 	return int64(hash.Sum64())
 }
 
-func shuffleBits(b uint8, rnd_ *rand.Rand) uint8 {
-
-	bits := make([]uint8, 8)
-	for idx := 0; idx < 8; idx++ {
-		bits[idx] = (b >> idx) & 1
+// buildOrder строит перестановку байтов.
+//
+// Параметры:
+//   - cntBytes: длина потока, >= 0.
+//   - generator: генератор, меняет состояние.
+//
+// Возвращает: перестановку номеров байтов.
+func buildOrder(
+	cntBytes int,
+	generator *rand.Rand,
+) []uint32 {
+	order := make([]uint32, cntBytes)
+	for indByte := range order {
+		order[indByte] = uint32(indByte)
 	}
+	generator.Shuffle(
+		cntBytes,
+		func(indLeft, indRight int) {
+			order[indLeft], order[indRight] =
+				order[indRight], order[indLeft]
+		},
+	)
+	return order
+}
 
-	indexes := make([]uint8, 8)
-	for idx := range indexes {
-		indexes[idx] = uint8(idx)
+// nextBitOrder строит очередную перестановку
+// битов байта.
+//
+// Параметры:
+//   - generator: генератор, меняет состояние.
+//
+// Возвращает: перестановку номеров битов.
+func nextBitOrder(generator *rand.Rand) bitOrder {
+	var order bitOrder
+	for indBit := range order {
+		order[indBit] = uint8(indBit)
 	}
+	generator.Shuffle(
+		CNT_BITS_BYTE,
+		func(indLeft, indRight int) {
+			order[indLeft], order[indRight] =
+				order[indRight], order[indLeft]
+		},
+	)
+	return order
+}
 
-	rnd_.Shuffle(len(indexes), func(i, j int) {
-		indexes[i], indexes[j] = indexes[j], indexes[i]
-	})
+// keepBits оставляет биты байта на местах и
+// не расходует генератор.
+func keepBits(value uint8, _ *rand.Rand) uint8 {
+	return value
+}
 
-	new_bits := make([]uint8, 8)
-	for idx := range indexes {
-		new_bits[idx] = bits[indexes[idx]]
-	}
-
+// shuffleBits переставляет биты байта: бит
+// с номером order[ind] встаёт на место ind.
+func shuffleBits(
+	value uint8,
+	generator *rand.Rand,
+) uint8 {
 	shuffled := uint8(0)
-	for idx, el := range new_bits {
-		shuffled |= el << idx
+	for indBit, indFrom := range nextBitOrder(generator) {
+		shuffled |= (value >> indFrom & 1) << indBit
 	}
-
 	return shuffled
 }
 
-func unshuffleBits(b uint8, rnd_ *rand.Rand) uint8 {
-
-	bits := make([]uint8, 8)
-	for idx := 0; idx < 8; idx++ {
-		bits[idx] = (b >> idx) & 1
+// unshuffleBits возвращает биты байта на
+// исходные места.
+func unshuffleBits(
+	value uint8,
+	generator *rand.Rand,
+) uint8 {
+	restored := uint8(0)
+	for indBit, indFrom := range nextBitOrder(generator) {
+		restored |= (value >> indBit & 1) << indFrom
 	}
-
-	indexes := make([]uint8, 8)
-	for idx := range indexes {
-		indexes[idx] = uint8(idx)
-	}
-
-	rnd_.Shuffle(len(indexes), func(i, j int) {
-		indexes[i], indexes[j] = indexes[j], indexes[i]
-	})
-
-	new_bits := make([]uint8, 8)
-	for idx := range indexes {
-		new_bits[indexes[idx]] = bits[idx]
-	}
-
-	shuffled := uint8(0)
-	for idx, el := range new_bits {
-		shuffled |= el << idx
-	}
-
-	return shuffled
+	return restored
 }
 
-func ShuffleFile(input_file, output_file string, code string, shuffle_bits bool) error {
-	inputFile, err := os.OpenFile(input_file, os.O_RDONLY, 0600)
-	if err != nil {
-		return err
+// pickMixer выбирает преобразование битов.
+//
+// Параметры:
+//   - isBitShuffle: переставлять ли биты.
+//   - mixer: преобразование при перестановке.
+//
+// Возвращает: выбранное преобразование.
+func pickMixer(
+	isBitShuffle bool,
+	mixer func(uint8, *rand.Rand) uint8,
+) func(uint8, *rand.Rand) uint8 {
+	picked := keepBits
+	if isBitShuffle {
+		picked = mixer
 	}
-	defer inputFile.Close()
-
-	fileInfo, err := inputFile.Stat()
-	if err != nil {
-		return err
-	}
-	fileSize := fileInfo.Size()
-
-	mmapData, err := mmap.Map(inputFile, mmap.RDONLY, 0)
-	if err != nil {
-		return err
-	}
-
-	indexes := make([]uint32, fileSize)
-	for idx := range indexes {
-		indexes[idx] = uint32(idx)
-	}
-
-	rnd := rand.New(rand.NewSource(hashInt64(code)))
-	rnd.Shuffle(len(indexes), func(i, j int) {
-		indexes[i], indexes[j] = indexes[j], indexes[i]
-	})
-
-	outputFile, err := os.OpenFile(output_file, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
-	if err != nil {
-		return err
-	}
-	defer outputFile.Close()
-
-	writer := bufio.NewWriter(outputFile)
-	defer writer.Flush()
-
-	for idx := range indexes {
-		el := mmapData[indexes[idx]]
-
-		if shuffle_bits {
-			el = shuffleBits(el, rnd)
-		}
-
-		err = writer.WriteByte(el)
-		if err != nil {
-			return err
-		}
-	}
-
-	writer.Flush()
-
-	if err := mmapData.Unmap(); err != nil {
-		return err
-	}
-
-	return nil
+	return picked
 }
 
-func UnshuffleFile(input_file, output_file string, code string, unshuffle_bits bool) error {
-	inputFile, err := os.OpenFile(input_file, os.O_RDONLY, 0600)
-	if err != nil {
-		return err
+// Shuffle перемешивает поток по ключу.
+//
+// Параметры:
+//   - src: исходный поток, до 2^32 байтов.
+//   - key: ключ перемешивания.
+//   - isBitShuffle: переставлять ли биты
+//     внутри каждого байта.
+//
+// Возвращает: перемешанный поток той же
+// длины.
+func Shuffle(
+	src []byte,
+	key string,
+	isBitShuffle bool,
+) []byte {
+	generator := rand.New(rand.NewSource(SeedOf(key)))
+	order := buildOrder(len(src), generator)
+	mixer := pickMixer(isBitShuffle, shuffleBits)
+	dst := make([]byte, len(src))
+	for indDst, indSrc := range order {
+		dst[indDst] = mixer(src[indSrc], generator)
 	}
-	defer inputFile.Close()
-
-	fileInfo, err := inputFile.Stat()
-	if err != nil {
-		return err
-	}
-	fileSize := fileInfo.Size()
-
-	indexes := make([]uint32, fileSize)
-	for idx := range indexes {
-		indexes[idx] = uint32(idx)
-	}
-
-	rnd := rand.New(rand.NewSource(hashInt64(code)))
-	rnd.Shuffle(len(indexes), func(i, j int) {
-		indexes[i], indexes[j] = indexes[j], indexes[i]
-	})
-
-	outputFile, err := os.OpenFile(output_file, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)
-	if err != nil {
-		return err
-	}
-	defer outputFile.Close()
-
-	err = os.Truncate(output_file, fileSize)
-	if err != nil {
-		return err
-	}
-
-	mmapData_output, err := mmap.Map(outputFile, mmap.RDWR, 0)
-	if err != nil {
-		return err
-	}
-
-	reader := bufio.NewReader(inputFile)
-
-	for idx := range indexes {
-
-		el, err := reader.ReadByte()
-		if err != nil && err != io.EOF {
-			return err
-		}
-
-		if err == io.EOF {
-			break
-		}
-
-		if unshuffle_bits {
-			el = unshuffleBits(el, rnd)
-		}
-
-		mmapData_output[indexes[idx]] = el
-	}
-
-	mmapData_output.Flush()
-
-	if err := mmapData_output.Unmap(); err != nil {
-		return err
-	}
-
-	return nil
+	return dst
 }
 
-/*
-
-func main() {
-
-    rnd := rand.New(rand.NewSource(101))
-    // fmt.Println("=> ", rnd.Intn(10))
-
-    r1 := shuffleBits(117, rnd)
-	fmt.Println(r1)
-
-    rnd = rand.New(rand.NewSource(101))
-    // fmt.Println("=> ", rnd.Intn(10))
-
-    r2 := unshuffleBits(r1, rnd)
-	fmt.Println(r2)
-
-*/
-
-/*
-
-	file_input := "test.webm"
-	file_output := file_input + "_"
-	file_output2 := file_output + "_"
-
-	err := ShuffleFile(file_input, file_output, "127")
-	if err != nil {
-		fmt.Println(err)
+// Unshuffle восстанавливает порядок потока.
+//
+// Параметры:
+//   - src: перемешанный поток.
+//   - key: ключ перемешивания.
+//   - isBitShuffle: переставлялись ли биты
+//     внутри каждого байта.
+//
+// Возвращает: поток в исходном порядке.
+func Unshuffle(
+	src []byte,
+	key string,
+	isBitShuffle bool,
+) []byte {
+	generator := rand.New(rand.NewSource(SeedOf(key)))
+	order := buildOrder(len(src), generator)
+	mixer := pickMixer(isBitShuffle, unshuffleBits)
+	dst := make([]byte, len(src))
+	for indSrc, indDst := range order {
+		dst[indDst] = mixer(src[indSrc], generator)
 	}
-
-	err = UnshuffleFile(file_output, file_output2, "127")
-	if err != nil {
-		fmt.Println(err)
-    }
-
+	return dst
 }
-*/

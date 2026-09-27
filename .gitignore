@@ -1,5 +1,8 @@
 old.go
-stegano2
+/stegano2
 data/chai.mp4
+data/dubrowskij.txt
 data/dubrowskij.txt.youtube
 data/Jose.Raul.Capablanca2.mp4
+data/*_new.*
+data/.stegano2-part-*
